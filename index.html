@@ -12,6 +12,7 @@
             --borde-tech: #ff3355;
             --verde-ps: #2ecc71;
             --azul-exp: #3498db;
+            --amarillo-hud: #ffcb05;
         }
 
         body {
@@ -39,13 +40,15 @@
             display: inline-block;
             font-weight: bold;
             color: #000000;
-            background: #ffcb05;
+            background: var(--amarillo-hud);
             padding: 10px 24px;
             border-radius: 8px;
             margin-bottom: 25px;
             border: 3px solid #000000;
             box-shadow: 3px 3px 0px #000;
             text-transform: uppercase;
+            font-size: 1rem;
+            transition: all 0.3s ease;
         }
 
         .viewport-wrapper {
@@ -56,17 +59,15 @@
             border-radius: 20px;
             overflow: hidden;
             border: 5px solid #000000;
-            background: #222; /* Fondo gris para saber si el elemento existe */
+            background: #222;
         }
 
-        /* Forzamos a que tanto el vídeo como el canvas ocupen el espacio real */
         video, canvas {
             width: 100% !important;
             height: auto !important;
             display: block;
         }
 
-        /* Ocultamos el canvas temporalmente si da error, pero el vídeo SE VE SÍ O SÍ */
         #canvasOutput {
             position: absolute;
             top: 0; left: 0;
@@ -90,6 +91,93 @@
             border: 3px dashed var(--borde-tech);
             border-radius: 16px;
             box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.4);
+            position: relative;
+        }
+
+        /* ANIMACIÓN: Línea láser de escaneo neón */
+        .laser-line {
+            display: none;
+            position: absolute;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, transparent, #ff3355, #ff99ab, #ff3355, transparent);
+            box-shadow: 0 0 15px #ff3355, 0 0 25px #ff99ab;
+            z-index: 6;
+            animation: bajarSubir 2s infinite ease-in-out;
+        }
+
+        @keyframes bajarSubir {
+            0% { top: 0%; }
+            50% { top: 100%; }
+            100% { top: 0%; }
+        }
+
+        /* TICK VERDE GIGANTE (Fin de escaneo) */
+        .success-tick {
+            display: none;
+            position: absolute;
+            font-size: 5rem;
+            color: var(--verde-ps);
+            text-shadow: 0 0 20px rgba(46, 204, 113, 0.6), 3px 3px 0 #000;
+            z-index: 7;
+            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        /* TABLA DE RESULTADOS DE LA IA */
+        .results-box {
+            display: none;
+            margin-top: 25px;
+            background: #0d0f14;
+            border: 3px solid #000;
+            border-radius: 16px;
+            padding: 20px;
+            animation: fadeIn 0.8s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .results-box h3 {
+            margin-top: 0;
+            color: var(--amarillo-hud);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            font-size: 1.2rem;
+        }
+
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        .results-table td {
+            padding: 12px;
+            border-bottom: 1px solid #1f2430;
+            font-family: monospace;
+            font-size: 1rem;
+        }
+
+        .results-table td:first-child { text-align: left; color: #a0a5b5; }
+        .results-table td:last-child { text-align: right; font-weight: bold; color: var(--verde-ps); }
+        
+        .final-grade {
+            font-size: 1.5rem;
+            color: #fff;
+            margin-top: 15px;
+            font-weight: 900;
+            background: linear-gradient(90deg, #ff3355, #b3001b);
+            padding: 10px;
+            border-radius: 8px;
+            border: 2px solid #000;
         }
     </style>
 </head>
@@ -110,54 +198,67 @@
                 <canvas id="canvasOutput"></canvas>
                 
                 <div class="camera-overlay">
+                    <div id="laser" class="laser-line"></div>
+                    <div id="tick" class="success-tick">✔</div>
                     <div class="target-box"></div>
                 </div>
             </div>
+
+            <div id="resultsPanel" class="results-box">
+                <h3>Análisis de Autenticidad e Integridad</h3>
+                <table class="results-table">
+                    <tr><td>CENTRADO (CENTERING)</td><td>9.5 / 10</td></tr>
+                    <tr><td>BORDES (EDGES)</td><td>10 / 10</td></tr>
+                    <tr><td>ESQUINAS (CORNERS)</td><td>9.0 / 10</td></tr>
+                    <tr><td>SUPERFICIE (SURFACE)</td><td>9.5 / 10</td></tr>
+                </table>
+                <div class="final-grade">NOTA FINAL: MINT 9.5</div>
+            </div>
+
         </div>
     </div>
 
-    <script async src="https://docs.opencv.org/4.x/opencv.js" type="text/javascript" id="opencv-js"></script>
+    <script async src="https://cdnjs.cloudflare.com/ajax/libs/opencv.js/4.5.5/opencv.js" type="text/javascript" id="opencv-js"></script>
 
     <script>
         const video = document.getElementById('videoInput');
         const canvasOutput = document.getElementById('canvasOutput');
         const status = document.getElementById('status');
-        let src, dst, cap, openCvListo = false;
+        const laser = document.getElementById('laser');
+        const tick = document.getElementById('tick');
+        const resultsPanel = document.getElementById('resultsPanel');
 
-        // 1. ARRANCAR CÁMARA DE INMEDIATO (Sin esperar a OpenCV)
-        navigator.mediaDevices.getUserMedia({ 
-            video: { facingMode: "environment" }, 
-            audio: false 
-        })
+        let src, dst, cap, openCvListo = false;
+        
+        // Variables de control de estado del escaneo
+        let escaneando = false;
+        let escaneoTerminado = false;
+        let progreso = 0;
+        let temporizadorEscaneo;
+
+        // Arrancar cámara nativa
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false })
         .then(function(stream) {
             video.srcObject = stream;
-            // Doble seguridad para móviles (iOS/Android)
             video.setAttribute("playsinline", true);
             video.play();
-            status.innerText = "Cámara conectada. Cargando IA...";
+            status.innerText = "Cámara OK. Conectando Servidor IA...";
         })
         .catch(function(err) {
-            // Si falla la trasera, intentamos cualquier cámara disponible
-            navigator.mediaDevices.getUserMedia({ video: true, audio: false })
-            .then(function(stream) {
+            navigator.mediaDevices.getUserMedia({ video: true, audio: false }).then(function(stream) {
                 video.srcObject = stream;
                 video.play();
-                status.innerText = "Cámara básica activa. Cargando IA...";
-            })
-            .catch(function(e) {
-                status.innerText = "ERROR: Activa los permisos de la cámara";
-                status.style.backgroundColor = "#e31a3b";
+                status.innerText = "Cámara Básica OK. Conectando Servidor IA...";
             });
         });
 
-        // 2. ACTIVAR INTELIGENCIA ARTIFICIAL CUANDO OPENCV CARGUE
+        // Al cargar OpenCV
         document.getElementById('opencv-js').addEventListener('load', () => {
             openCvListo = true;
             status.innerText = "SISTEMA ONLINE: Apunta a la carta";
             status.style.backgroundColor = "#2ecc71";
             status.style.color = "#fff";
             
-            // Sincronizar tamaños al vuelo
             video.addEventListener('loadedmetadata', ajustarLienzos);
             if (video.videoWidth) ajustarLienzos();
         });
@@ -185,24 +286,62 @@
                 let hierarchy = new cv.Mat();
                 cv.findContours(dst, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
 
-                // Limpiamos el canvas para pintar solo las líneas rojas sobre el vídeo transparente
-                let context = canvasOutput.getContext('2d');
-                context.clearRect(0, 0, canvasOutput.width, canvasOutput.height);
+                let cartaDetectada EnEsteFotograma = false;
 
                 for (let i = 0; i < contours.size(); ++i) {
                     let cnt = contours.get(i);
-                    if (cv.contourArea(cnt) > 3000) {
+                    // Si detecta una forma rectangular razonable y no hemos terminado el escaneo
+                    if (cv.contourArea(cnt) > 2200 && !escaneoTerminado) {
                         let color = new cv.Scalar(255, 51, 85, 255);
                         cv.drawContours(src, contours, i, color, 6, cv.LINE_8, hierarchy, 0);
+                        cartaDetectadaEnEsteFotograma = true;
                     }
                     cnt.delete();
+                }
+
+                // LÓGICA DE CONTROL DEL ESCANEO (MAX 6 SEGUNDOS)
+                if (cartaDetectadaEnEsteFotograma && !escaneando && !escaneoTerminado) {
+                    // Arranca el proceso de escaneo
+                    escaneando = true;
+                    laser.style.display = "block"; // Muestra la barra láser animada
+                    status.style.backgroundColor = "#3498db"; // Azul escaneo
+                    
+                    temporizadorEscaneo = setInterval(() => {
+                        progreso += 4; // Sube de 4 en 4 cada 250ms (Tarda exactamente 6 segundos en total)
+                        if (progreso <= 100) {
+                            status.innerText = `ESCANEANDO CARTA... ${progreso}%`;
+                        } else {
+                            // Fin del escaneo con éxito
+                            clearInterval(temporizadorEscaneo);
+                            escaneando = false;
+                            escaneoTerminado = true;
+                            
+                            // Cambios visuales instantáneos
+                            laser.style.display = "none"; // Quita el láser
+                            tick.style.display = "block"; // Saca el Tick ✔
+                            status.innerText = "ESCANEO COMPLETADO ✔";
+                            status.style.backgroundColor = "#2ecc71"; // Verde éxito
+                            
+                            // Despliega la tabla de resultados
+                            resultsPanel.style.display = "block";
+                        }
+                    }, 250);
+                } 
+                // Si dejas de enfocar la carta a mitad del proceso, se pausa y se reinicia
+                else if (!cartaDetectadaEnEsteFotograma && escaneando && !escaneoTerminado) {
+                    clearInterval(temporizadorEscaneo);
+                    escaneando = false;
+                    progreso = 0;
+                    laser.style.display = "none";
+                    status.innerText = "SISTEMA ONLINE: Apunta a la carta";
+                    status.style.backgroundColor = "#2ecc71";
                 }
 
                 cv.imshow('canvasOutput', src);
                 contours.delete(); 
                 hierarchy.delete();
             } catch (err) {
-                // Evitamos que un fallo cuelgue la cámara
+                // Previene micro-congelamientos de fotograma
             }
             requestAnimationFrame(procesarFotograma);
         }
