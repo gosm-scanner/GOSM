@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GOSM - AI Universal Grader</title>
+    <style>
+        :root {
+            --rojo-pokedex: #e31a3b; /* Rojo Pokédex Vivo */
+            --rojo-neon: #ff4d6d;
+            --oscuridad-total: #08090c;
+            --gris-interfaz: #151821; /* Gris oscuro premium */
+            --borde-tech: #ff3355;
+            --verde-ps: #2ecc71; /* Verde barra de vida */
+            --azul-exp: #3498db; /* Azul barra de experiencia */
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            text-align: center;
+            background-color: var(--oscuridad-total);
+            background-image: radial-gradient(rgba(227, 26, 59, 0.15) 1px, transparent 0);
+            background-size: 24px 24px; /* Fondo sutil con cuadrícula tech */
+            color: #ffffff;
+            padding: 0;
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Encabezado Pokédex Premium */
+        header {
+            background: linear-gradient(180deg, var(--rojo-pokedex) 0%, #b3001b 100%);
+            border-bottom: 6px solid #000000;
+            padding: 20px;
+            position: relative;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.6);
+        }
+
+        /* Lente de la Pokédex luminoso en el centro */
+        header::before {
+            content: '';
+            position: absolute;
+            bottom: -18px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 24px;
+            height: 24px;
+            background: #2575fc;
+            border: 5px solid #000000;
+            border-radius: 50%;
+            box-shadow: 0 0 12px #2575fc, inset 0 0 5px #fff;
+            z-index: 10;
+        }
+
+        .logo-container h1 {
+            margin: 0;
+            font-size: 2.5rem;
+            letter-spacing: 5px;
+            color: #ffffff;
+            font-weight: 900;
+            text-shadow: 3px 3px 0px #000;
+        }
+
+        .logo-container span {
+            font-size: 0.8rem;
+            color: #ffccd4;
+            display: block;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            font-weight: 700;
+            margin-top: 5px;
+        }
+
+        /* Espacio de Anuncios Estilizado */
+        .ads-banner-top {
+            max-width: 728px;
+            width: 90%;
+            height: 90px;
+            background: rgba(21, 24, 33, 0.6);
+            border: 2px dashed #ff3355;
+            margin: 35px auto 0 auto;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ff4d6d;
+            font-size: 0.75rem;
+            letter-spacing: 2px;
+            font-weight: bold;
+            box-shadow: inset 0 0 15px rgba(255, 51, 85, 0.1);
+        }
+
+        .main-container {
+            max-width: 800px;
+            width: 90%;
+            margin: 40px auto;
+            flex-grow: 1;
+        }
+
+        /* Consola del Escáner (Estilo Batalla Pokémon) */
+        .scanner-card {
+            background: var(--gris-interfaz);
+            border: 4px solid #000000;
+            border-radius: 24px;
+            padding: 35px 25px;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.8), 0 0 30px rgba(227, 26, 59, 0.1);
+            position: relative;
+        }
+
+        /* Decoración de Interfaz: Datos de Combate a la izquierda */
+        .pokemon-hud-left {
+            text-align: left;
+            max-width: 440px;
+            margin: 0 auto 15px auto;
+            font-family: monospace;
+            font-weight: bold;
+        }
+        .hud-name { font-size: 1.1rem; letter-spacing: 1px; color: #fff; }
+        .hud-level { float: right; color: #ffcb05; } /* Amarillo Pokémon clásico */
+        
+        /* Barras de vida y experiencia decorativas */
+        .bar-container {
+            background: #000;
+            border: 2px solid #000;
+            height: 8px;
+            border-radius: 4px;
+            margin-top: 4px;
+            overflow: hidden;
+        }
+        .bar-fill-hp { width: 100%; height: 100%; background: var(--verde-ps); }
+        .bar-fill-exp { width: 75%; height: 100%; background: var(--azul-exp); }
+
+        /* Estado del Escáner Estilo Cuadro de Texto de Combate */
+        .status-badge {
+            display: inline-block;
+            font-weight: bold;
+            font-size: 0.85rem;
+            color: #000000;
+            background: #ffcb05; /* Color Oro Pokémon */
+            padding: 10px 24px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+            border: 3px solid #000000;
+            box-shadow: 3px 3px 0px #000;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        /* Marco de la Cámara */
+        .viewport-wrapper {
+            position: relative;
+            max-width: 440px;
+            margin: 0 auto;
+            border-radius: 20px;
+            overflow: hidden;
+            border: 5px solid #000000;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.9);
+            background: #000;
+        }
+
+        video, canvas {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        #canvasOutput {
+            display: none;
+        }
+
+        /* Animación Láser del Escáner */
+        .camera-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            pointer-events: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .target-box {
+            width: 72%;
+            height: 76%;
+            border: 3px solid var(--borde-tech);
+            border-radius: 16px;
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.6);
+            position: relative;
+            animation: pulse-laser 2s infinite ease-in-out;
+        }
+
+        @keyframes pulse-laser {
+            0% { border-color: var(--borde-tech); box-shadow: 0 0 5px rgba(255,51,85,0.3), 0 0 0 9999px rgba(0, 0, 0, 0.6); }
+            50% { border-color: #ffccd4; box-shadow: 0 0 20px rgba(255,51,85,0.7), 0 0 0 9999px rgba(0, 0, 0, 0.6); }
+            100% { border-color: var(--borde-tech); box-shadow: 0 0 5px rgba(255,51,85,0.3), 0 0 0 9999px rgba(0, 0, 0, 0.6); }
+        }
+
+        /* Espacio de Anuncios Inferior */
+        .ads-banner-bottom {
+            max-width: 300px;
+            width: 90%;
+            height: 250px;
+            background: rgba(21, 24, 33, 0.6);
+            border: 2px dashed #ff3355;
+            margin: 40px auto 20px auto;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ff4d6d;
+            font-size: 0.75rem;
+            font-weight: bold;
+            letter-spacing: 1px;
+            box-shadow: inset 0 0 15px rgba(255, 51, 85, 0.1);
+        }
+
+        footer {
+            margin-top: auto;
+            padding: 25px;
+            font-size: 0.8rem;
+            color: #a3243c;
+            border-top: 3px solid #000;
+            background: #0d0103;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo-container">
+            <h1>GOSM</h1>
+            <span>Universal AI Card Monitor</span>
+        </div>
+    </header>
+
+    <div class="ads-banner-top">
+        <span>ESPACIO ADSENSE DISPONIBLE (728x90)</span>
+    </div>
+
+    <div class="main-container">
+        
+        <div class="scanner-card">
+            
+            <div class="pokemon-hud-left">
+                <span class="hud-name">SCANNER_CORE.EXE</span>
+                <span class="hud-level">Lv.100</span>
+                <div style="font-size: 0.7rem; color: var(--texto-mutated); margin-top: 5px;">HP (ESTADO DEL MOTOR)</div>
+                <div class="bar-container">
+                    <div class="bar-fill-hp"></div>
+                </div>
+                <div style="font-size: 0.7rem; color: var(--texto-mutated); margin-top: 5px;">EXP (ANÁLISIS DE RENDIMIENTO)</div>
+                <div class="bar-container">
+                    <div class="bar-fill-exp"></div>
+                </div>
+            </div>
+
+            <div id="status" class="status-badge">Iniciando Pokédex GOSM...</div>
+            
+            <div class="viewport-wrapper">
+                <video id="videoInput" autoplay playsinline muted style="display:none;"></video>
+                <canvas id="canvasOutput"></canvas>
+                
+                <div class="camera-overlay">
+                    <div class="target-box"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="ads-banner-bottom">
+            <span>ESPACIO ADSENSE DISPONIBLE (300x250)</span>
+        </div>
+
+    </div>
+
+    <footer>
+        &copy; 2026 GOSM Lab &bull; Sistema de escaneo universal libre automatizado.
+    </footer>
+
+    <script async src="https://docs.opencv.org/4.x/opencv.js" type="text/javascript" id="opencv-js"></script>
+
+    <script>
+        const video = document.getElementById('videoInput');
+        const canvasOutput = document.getElementById('canvasOutput');
+        const status = document.getElementById('status');
+
+        document.getElementById('opencv-js').addEventListener('load', () => {
+            status.innerText = "SISTEMA ONLINE: Conectando visor...";
+            status.style.backgroundColor = "#2ecc71";
+            status.style.color = "#fff";
+            
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false })
+                .then(function(stream) {
+                    video.srcObject = stream;
+                    video.play();
+                    video.style.display = "none"; 
+                    canvasOutput.style.display = "block"; 
+                    
+                    status.innerText = "SISTEMA LISTO: Apunta a la carta";
+                    
+                    setTimeout(procesarCamara, 1000);
+                })
+                .catch(function(err) {
+                    status.innerText = "ERROR DE CONEXIÓN VIRTUAL";
+                    status.style.backgroundColor = "#e31a3b";
+                    status.style.color = "#fff";
+                });
+        });
+
+        function procesarCamara() {
+            canvasOutput.width = video.videoWidth;
+            canvasOutput.height = video.videoHeight;
+
+            let src = new cv.Mat(video.videoHeight, video.videoWidth, cv.CV_8UC4);
+            let dst = new cv.Mat(video.videoHeight, video.videoWidth, cv.CV_8UC1);
+            let cap = new cv.VideoCapture(video);
+
+            const FPS = 30;
+            function procesarFPS() {
+                try {
+                    cap.read(src);
+                    cv.cvtColor(src, dst, cv.COLOR_RGBA2GRAY);
+                    cv.GaussianBlur(dst, dst, new cv.Size(5, 5), 0);
+                    cv.Canny(dst, dst, 50, 150, 3);
+
+                    let contours = new cv.MatVector();
+                    let hierarchy = new cv.Mat();
+                    cv.findContours(dst, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+
+                    cv.imshow('canvasOutput', src);
+
+                    for (let i = 0; i < contours.size(); ++i) {
+                        let cnt = contours.get(i);
+                        let area = cv.contourArea(cnt);
+                        
+                        if (area > 9500) {
+                            let color = new cv.Scalar(227, 26, 59, 255); // Líneas de escaneo en Rojo Pokédex
+                            cv.drawContours(src, contours, i, color, 4, cv.LINE_8, hierarchy, 0);
+                            cv.imshow('canvasOutput', src);
+                        }
+                        cnt.delete();
+                    }
+
+                    contours.delete(); hierarchy.delete();
+                    setTimeout(procesarFPS, 1000 / FPS);
+                } catch (err) {
+                    setTimeout(procesarFPS, 1000 / FPS);
+                }
+            }
+            procesarFPS();
+        }
+    </script>
+</body>
+</html>
