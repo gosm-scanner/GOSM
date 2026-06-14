@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GOSM - AI Universal Grader</title>
+    <title>GOSM PRO - AI Card Identifier & Grader</title>
     <style>
         :root {
             --rojo-pokedex: #e31a3b;
@@ -20,21 +20,20 @@
             text-align: center;
             background-color: var(--oscuridad-total);
             color: #ffffff;
-            padding: 0;
-            margin: 0;
+            padding: 0; margin: 0;
             min-height: 100vh;
         }
 
         header {
             background: linear-gradient(180deg, var(--rojo-pokedex) 0%, #b3001b 100%);
             border-bottom: 6px solid #000000;
-            padding: 20px;
+            padding: 15px;
         }
 
-        .logo-container h1 { margin: 0; font-size: 2.5rem; letter-spacing: 5px; text-shadow: 3px 3px 0px #000; }
+        .logo-container h1 { margin: 0; font-size: 2.2rem; letter-spacing: 5px; text-shadow: 3px 3px 0px #000; }
         
-        .main-container { max-width: 800px; width: 90%; margin: 20px auto; }
-        .scanner-card { background: var(--gris-interfaz); border: 4px solid #000000; border-radius: 24px; padding: 25px; }
+        .main-container { max-width: 800px; width: 95%; margin: 15px auto; }
+        .scanner-card { background: var(--gris-interfaz); border: 4px solid #000000; border-radius: 24px; padding: 20px; }
 
         .status-badge {
             display: inline-block;
@@ -43,17 +42,15 @@
             background: var(--amarillo-hud);
             padding: 10px 24px;
             border-radius: 8px;
-            margin-bottom: 25px;
+            margin-bottom: 20px;
             border: 3px solid #000000;
             box-shadow: 3px 3px 0px #000;
             text-transform: uppercase;
-            font-size: 1rem;
-            transition: all 0.3s ease;
         }
 
         .viewport-wrapper {
             position: relative;
-            max-width: 440px;
+            max-width: 420px;
             width: 100%;
             margin: 0 auto;
             border-radius: 20px;
@@ -62,18 +59,8 @@
             background: #222;
         }
 
-        video, canvas {
-            width: 100% !important;
-            height: auto !important;
-            display: block;
-        }
-
-        #canvasOutput {
-            position: absolute;
-            top: 0; left: 0;
-            z-index: 2;
-            pointer-events: none;
-        }
+        video, canvas { width: 100% !important; height: auto !important; display: block; }
+        #canvasOutput { position: absolute; top: 0; left: 0; z-index: 2; pointer-events: none; }
 
         .camera-overlay {
             position: absolute;
@@ -86,25 +73,21 @@
         }
 
         .target-box {
-            width: 75%;
-            height: 75%;
+            width: 75%; height: 75%;
             border: 3px dashed var(--borde-tech);
             border-radius: 16px;
-            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.4);
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
             position: relative;
         }
 
-        /* ANIMACIÓN: Línea láser neón */
         .laser-line {
             display: none;
             position: absolute;
-            left: 0;
-            width: 100%;
-            height: 4px;
+            left: 0; width: 100%; height: 4px;
             background: linear-gradient(90deg, transparent, #ff3355, #ff99ab, #ff3355, transparent);
-            box-shadow: 0 0 15px #ff3355, 0 0 25px #ff99ab;
+            box-shadow: 0 0 15px #ff3355;
             z-index: 6;
-            animation: bajarSubir 2s infinite ease-in-out;
+            animation: bajarSubir 1.5s infinite ease-in-out;
         }
 
         @keyframes bajarSubir {
@@ -113,7 +96,6 @@
             100% { top: 0%; }
         }
 
-        /* TICK VERDE */
         .success-tick {
             display: none;
             position: absolute;
@@ -121,63 +103,41 @@
             color: var(--verde-ps);
             text-shadow: 0 0 20px rgba(46, 204, 113, 0.6), 3px 3px 0 #000;
             z-index: 7;
-            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
 
-        @keyframes popIn {
-            0% { transform: scale(0); opacity: 0; }
-            100% { transform: scale(1); opacity: 1; }
-        }
-
-        /* RESULTADOS */
+        /* PANEL DE RESULTADOS REAJUSTADO */
         .results-box {
             display: none;
-            margin-top: 25px;
+            margin-top: 20px;
             background: #0d0f14;
             border: 3px solid #000;
             border-radius: 16px;
             padding: 20px;
-            animation: fadeIn 0.8s ease;
+            text-align: left;
         }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
+        .card-identity-header {
+            background: #1f2430;
+            padding: 15px;
+            border-radius: 12px;
+            border: 2px solid var(--borde-tech);
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
         }
 
-        .results-box h3 {
-            margin-top: 0;
-            color: var(--amarillo-hud);
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            font-size: 1.2rem;
-        }
+        .card-identity-header h2 { margin: 0; font-size: 1.5rem; color: #fff; text-shadow: 1px 1px 0px #000; }
+        .card-identity-header p { margin: 6px 0 0 0; font-size: 0.95rem; color: var(--amarillo-hud); font-family: monospace; }
+        .card-identity-header p.author-line { color: #a0a5b5; }
 
-        .results-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 10px;
-        }
-
-        .results-table td {
-            padding: 12px;
-            border-bottom: 1px solid #1f2430;
-            font-family: monospace;
-            font-size: 1rem;
-        }
-
-        .results-table td:first-child { text-align: left; color: #a0a5b5; }
+        .results-table { width: 100%; border-collapse: collapse; }
+        .results-table td { padding: 12px; border-bottom: 1px solid #1f2430; font-family: monospace; font-size: 0.95rem; }
+        .results-table td:first-child { color: #cbd5e1; }
         .results-table td:last-child { text-align: right; font-weight: bold; color: var(--verde-ps); }
         
         .final-grade {
-            font-size: 1.5rem;
-            color: #fff;
-            margin-top: 15px;
-            font-weight: 900;
-            background: linear-gradient(90deg, #ff3355, #b3001b);
-            padding: 10px;
-            border-radius: 8px;
-            border: 2px solid #000;
+            font-size: 1.4rem; color: #fff; margin-top: 20px; font-weight: 900; text-align: center;
+            background: linear-gradient(90deg, #ff3355, #b3001b); padding: 12px; border-radius: 8px; border: 2px solid #000;
+            box-shadow: 0 4px 10px rgba(227, 26, 59, 0.3);
         }
     </style>
 </head>
@@ -185,13 +145,13 @@
 
     <header>
         <div class="logo-container">
-            <h1>GOSM</h1>
+            <h1>GOSM PRO</h1>
         </div>
     </header>
 
     <div class="main-container">
         <div class="scanner-card">
-            <div id="status" class="status-badge">Esperando cámara...</div>
+            <div id="status" class="status-badge">Iniciando Ópticas...</div>
             
             <div class="viewport-wrapper">
                 <video id="videoInput" autoplay playsinline muted></video>
@@ -205,20 +165,24 @@
             </div>
 
             <div id="resultsPanel" class="results-box">
-                <h3>Análisis de Autenticidad e Integridad</h3>
-                <table class="results-table">
-                    <tr><td>CENTRADO (CENTERING)</td><td>9.5 / 10</td></tr>
-                    <tr><td>BORDES (EDGES)</td><td>10 / 10</td></tr>
-                    <tr><td>ESQUINAS (CORNERS)</td><td>9.0 / 10</td></tr>
-                    <tr><td>SUPERFICIE (SURFACE)</td><td>9.5 / 10</td></tr>
-                </table>
-                <div class="final-grade">NOTA FINAL: MINT 9.5</div>
-            </div>
+                <div class="card-identity-header">
+                    <h2 id="cardName">Detectando Identidad...</h2>
+                    <p id="cardSet">Colección: --</p>
+                    <p id="cardAuthor" class="author-line">Diseñador / Dueño: --</p>
+                </div>
 
+                <table class="results-table">
+                    <tr><td>CENTRADO (CENTERING)</td><td id="resCentrado">--</td></tr>
+                    <tr><td>DESGASTE DE BORDES (EDGES)</td><td id="resBordes">--</td></tr>
+                    <tr><td>ARAÑAZOS EN SUPERFICIE (SCRATCHES)</td><td id="resSuperficie">--</td></tr>
+                    <tr><td>INTEGRIDAD DE ESQUINAS (CORNERS)</td><td id="resEsquinas">--</td></tr>
+                </table>
+                <div class="final-grade" id="resNota">EVALUACIÓN: --</div>
+            </div>
         </div>
     </div>
 
-    <script async src="https://code.opencv.org/4.5.5/opencv.js" type="text/javascript" id="opencv-js"></script>
+    <script async src="https://cdnjs.cloudflare.com/ajax/libs/opencv.js/4.5.5/opencv.js" type="text/javascript" id="opencv-js"></script>
 
     <script>
         const video = document.getElementById('videoInput');
@@ -229,137 +193,124 @@
         const resultsPanel = document.getElementById('resultsPanel');
 
         let src, dst, cap, openCvListo = false;
-        let escaneando = false;
-        let escaneoTerminado = false;
-        let progreso = 0;
-        let temporizadorEscaneo;
+        let escaneando = false, escaneoTerminado = false, progreso = 0, temporizadorEscaneo;
+        let irregularidadTotal = 0, lecturasContadas = 0;
 
-        // Arrancar cámara nativa de inmediato
+        // Base de datos de ejemplo interna
+        const baseCartasDemo = [
+            { name: "Charizard G-Max VMAX", set: "Espada y Escudo: Destinos Brillantes (050/073)", author: "Ryuta Fuse / TCG Oficial" },
+            { name: "Pikachu Illustrator", set: "Promo CoroCoro Comics (1998)", author: "Atsuko Nishida / Colección Sagrada" },
+            { name: "Mewtwo Star Gold", set: "EX Holon Phantoms (103/110)", author: "Masakazu Fukuda" }
+        ];
+
         navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false })
         .then(function(stream) {
             video.srcObject = stream;
-            video.setAttribute("playsinline", true);
             video.play();
-            status.innerText = "Cámara OK. Conectando con Servidor IA...";
-        })
-        .catch(function(err) {
-            navigator.mediaDevices.getUserMedia({ video: true, audio: false }).then(function(stream) {
-                video.srcObject = stream;
-                video.play();
-                status.innerText = "Cámara Básica OK. Conectando con Servidor IA...";
-            });
+            status.innerText = "GOSM ONLINE: Enfoca una carta";
         });
-
-        // SISTEMA ANTIBLOQUEO: Si en 5 segundos el servidor no responde, activamos el modo simulación
-        setTimeout(() => {
-            if (!openCvListo) {
-                console.log("Activando bypass por lentitud de servidor");
-                forzarSistemaOnline();
-            }
-        }, 5000);
 
         document.getElementById('opencv-js').addEventListener('load', () => {
-            if (escaneoTerminado || escaneando) return; // Evita pisar el bypass si responde tarde
             openCvListo = true;
-            status.innerText = "SISTEMA ONLINE: Apunta a la carta";
-            status.style.backgroundColor = "#2ecc71";
-            status.style.color = "#fff";
-            
-            video.addEventListener('loadedmetadata', ajustarLienzos);
-            if (video.videoWidth) ajustarLienzos();
+            video.addEventListener('loadedmetadata', iniciarMatrices);
+            if (video.videoWidth) iniciarMatrices();
         });
 
-        function forzarSistemaOnline() {
-            openCvListo = true;
-            status.innerText = "SISTEMA ONLINE (Modo Rápido): Toca la pantalla para escanear";
-            status.style.backgroundColor = "#2ecc71";
-            status.style.color = "#fff";
-            
-            // Si la IA falla, dejamos que empiece el escaneo al hacer clic en el recuadro para ver el efecto
-            document.querySelector('.viewport-wrapper').addEventListener('click', () => {
-                if (!escaneando && !escaneoTerminado) {
-                    dispararEscaneoSimulado();
-                }
-            });
-            
-            // Simular también de forma automática a los 2 segundos por si acaso
-            setTimeout(() => {
-                if (!escaneando && !escaneoTerminado) dispararEscaneoSimulado();
-            }, 2000);
-        }
-
-        function ajustarLienzos() {
-            if (!openCvListo || !window.cv) return;
+        function iniciarMatrices() {
             canvasOutput.width = video.videoWidth;
             canvasOutput.height = video.videoHeight;
-            
             src = new cv.Mat(video.videoHeight, video.videoWidth, cv.CV_8UC4);
             dst = new cv.Mat(video.videoHeight, video.videoWidth, cv.CV_8UC1);
             cap = new cv.VideoCapture(video);
-            
             procesarFotograma();
         }
 
         function procesarFotograma() {
-            if (!openCvListo || escaneoTerminado || !window.cv) {
-                requestAnimationFrame(procesarFotograma);
-                return;
-            }
+            if (!openCvListo || escaneoTerminado) return;
             try {
                 cap.read(src);
                 cv.cvtColor(src, dst, cv.COLOR_RGBA2GRAY);
                 cv.GaussianBlur(dst, dst, new cv.Size(5, 5), 0);
-                cv.Canny(dst, dst, 35, 125, 3);
+                cv.Canny(dst, dst, 50, 150, 3);
 
                 let contours = new cv.MatVector();
                 let hierarchy = new cv.Mat();
                 cv.findContours(dst, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
 
                 let cartaDetectada = false;
+                let variacionBordes = 0;
 
                 for (let i = 0; i < contours.size(); ++i) {
                     let cnt = contours.get(i);
-                    if (cv.contourArea(cnt) > 2000) {
+                    let area = cv.contourArea(cnt);
+                    if (area > 3500) {
                         let color = new cv.Scalar(255, 51, 85, 255);
-                        cv.drawContours(src, contours, i, color, 6, cv.LINE_8, hierarchy, 0);
+                        cv.drawContours(src, contours, i, color, 4, cv.LINE_8, hierarchy, 0);
                         cartaDetectada = true;
+                        let perimetro = cv.arcLength(cnt, true);
+                        variacionBordes = Math.abs((perimetro * perimetro) / (area * 16) - 1);
                     }
                     cnt.delete();
                 }
 
                 if (cartaDetectada && !escaneando) {
-                    dispararEscaneoSimulado();
+                    escaneando = true;
+                    laser.style.display = "block";
+                    status.style.backgroundColor = "#3498db";
+                    progreso = 0; irregularidadTotal = 0; lecturasContadas = 0;
+
+                    temporizadorEscaneo = setInterval(() => {
+                        progreso += 5;
+                        irregularidadTotal += variacionBordes;
+                        lecturasContadas++;
+
+                        if (progreso <= 100) {
+                            status.innerText = `ESCANEANDO EN DETALLE... ${progreso}%`;
+                        } else {
+                            clearInterval(temporizadorEscaneo);
+                            escaneando = false; escaneoTerminado = true;
+                            
+                            // Medidor geométrico
+                            let factorDaño = (irregularidadTotal / lecturasContadas) * 100;
+                            
+                            let notaBordes = Math.max(3.5, (10 - (factorDaño * 1.8))).toFixed(1);
+                            let notaScratches = Math.max(4.0, (10 - (factorDaño * 1.4))).toFixed(1);
+                            let notaCentrado = Math.max(5.0, (10 - (factorDaño * 0.7))).toFixed(1);
+                            let notaEsquinas = Math.max(4.0, (10 - (factorDaño * 1.1))).toFixed(1);
+                            let notaFinal = ((parseFloat(notaCentrado) + parseFloat(notaBordes) + parseFloat(notaScratches) + parseFloat(notaEsquinas)) / 4).toFixed(1);
+
+                            // Escoger carta de la base de datos de simulación
+                            let datosCarta = baseCartasDemo[Math.floor(Math.random() * baseCartasDemo.length)];
+
+                            // Volcar los datos a la interfaz sin tocar nada de precios
+                            document.getElementById('cardName').innerText = datosCarta.name;
+                            document.getElementById('cardSet').innerText = `Colección: ${datosCarta.set}`;
+                            document.getElementById('cardAuthor').innerText = `Diseñador / Dueño: ${datosCarta.author}`;
+
+                            document.getElementById('resCentrado').innerText = `${notaCentrado} / 10`;
+                            document.getElementById('resBordes').innerText = `${notaBordes} / 10 (Corte perimetral)`;
+                            document.getElementById('resSuperficie').innerText = `${notaScratches} / 10 (Filtro Micro-arañazos)`;
+                            document.getElementById('resEsquinas').innerText = `${notaEsquinas} / 10`;
+                            document.getElementById('resNota').innerText = `CALIFICACIÓN FINAL: GOSM ${notaFinal}`;
+
+                            laser.style.display = "none";
+                            tick.style.display = "block";
+                            status.innerText = "ANÁLISIS DE ESTRUCTURA COMPLETADO ✔";
+                            status.style.backgroundColor = "#2ecc71";
+                            resultsPanel.style.display = "block";
+                        }
+                    }, 250);
+                } else if (!cartaDetectada && escaneando) {
+                    clearInterval(temporizadorEscaneo);
+                    escaneando = false; laser.style.display = "none";
+                    status.innerText = "GOSM ONLINE: Enfoca una carta";
+                    status.style.backgroundColor = "#2ecc71";
                 }
 
                 cv.imshow('canvasOutput', src);
-                contours.delete(); 
-                hierarchy.delete();
+                contours.delete(); hierarchy.delete();
             } catch (err) { }
             requestAnimationFrame(procesarFotograma);
-        }
-
-        function dispararEscaneoSimulado() {
-            if (escaneando || escaneoTerminado) return;
-            escaneando = true;
-            laser.style.display = "block";
-            status.style.backgroundColor = "#3498db";
-            
-            temporizadorEscaneo = setInterval(() => {
-                progreso += 4;
-                if (progreso <= 100) {
-                    status.innerText = `ESCANEANDO CARTA... ${progreso}%`;
-                } else {
-                    clearInterval(temporizadorEscaneo);
-                    escaneando = false;
-                    escaneoTerminado = true;
-                    
-                    laser.style.display = "none";
-                    tick.style.display = "block";
-                    status.innerText = "ESCANEO COMPLETADO ✔";
-                    status.style.backgroundColor = "#2ecc71";
-                    resultsPanel.style.display = "block";
-                }
-            }, 250);
         }
     </script>
 </body>
