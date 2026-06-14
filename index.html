@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GOSM PRO - PSA Style Card Analyzer</title>
+    <title>GOSM - Card Analyzer</title>
     <style>
         :root {
             --rojo-pokedex: #e31a3b;
@@ -160,7 +160,7 @@
 
     <header>
         <div class="logo-container">
-            <h1>GOSM PRO</h1>
+            <h1>GOSM</h1>
         </div>
     </header>
 
@@ -187,12 +187,12 @@
                 </div>
 
                 <table class="results-table">
-                    <tr><td>PSA CENTERING (60/40 Max)</td><td id="resCentrado">--</td></tr>
-                    <tr><td>PSA EDGES (Bordes / Whitening)</td><td id="resBordes">--</td></tr>
-                    <tr><td>PSA SURFACE (Micro-Scratches)</td><td id="resSuperficie">--</td></tr>
-                    <tr><td>PSA CORNERS (Desgaste Esquinas)</td><td id="resEsquinas">--</td></tr>
+                    <tr><td>CENTRADO (CENTERING)</td><td id="resCentrado">--</td></tr>
+                    <tr><td>BORDES (EDGES / WHITENING)</td><td id="resBordes">--</td></tr>
+                    <tr><td>SUPERFICIE (MICRO-SCRATCHES)</td><td id="resSuperficie">--</td></tr>
+                    <tr><td>ESQUINAS (CORNERS)</td><td id="resEsquinas">--</td></tr>
                 </table>
-                <div class="final-grade" id="resNota">CERTIFICACIÓN PSA: --</div>
+                <div class="final-grade" id="resNota">EVALUACIÓN GOSM: --</div>
                 
                 <button id="btnReset" class="btn-reset" onclick="reiniciarEscaner()">🔄 Evaluar Otra Carta</button>
             </div>
@@ -225,7 +225,7 @@
         .then(function(stream) {
             video.srcObject = stream;
             video.play();
-            status.innerText = "GOSM PSA: Enfoca la carta";
+            status.innerText = "GOSM: Enfoca la carta";
         });
 
         document.getElementById('opencv-js').addEventListener('load', () => {
@@ -249,7 +249,9 @@
                 cap.read(src);
                 cv.cvtColor(src, dst, cv.COLOR_RGBA2GRAY);
                 cv.GaussianBlur(dst, dst, new cv.Size(5, 5), 0);
-                cv.Canny(dst, dst, 80, 200, 3);
+                
+                // Suavizamos el Canny para que no se quede congelado nunca más
+                cv.Canny(dst, dst, 50, 150, 3);
 
                 let contours = new cv.MatVector();
                 let hierarchy = new cv.Mat();
@@ -262,7 +264,7 @@
                     let cnt = contours.get(i);
                     let area = cv.contourArea(cnt);
                     
-                    if (area > 4000) {
+                    if (area > 3000) { // Umbral equilibrado para que detecte al instante
                         let color = new cv.Scalar(255, 51, 85, 255);
                         cv.drawContours(src, contours, i, color, 4, cv.LINE_8, hierarchy, 0);
                         cartaDetectada = true;
@@ -272,9 +274,10 @@
                     cnt.delete();
                 }
 
-                if (cartaDetectada && perimetroIrregular > 0.08) { // Filtro PSA mucho más estricto (baja de 0.12 a 0.08)
+                // NUEVA ALERTA FLUIDA: Si se mueve demasiado o la imagen está borrosa, avisa sin bloquearse
+                if (cartaDetectada && perimetroIrregular > 0.15) {
                     targetBox.style.borderColor = "var(--amarillo-hud)";
-                    status.innerText = "⚠️ RESTRICCION PSA: MANTÉN TOTALMENTE ESTABLE / BORROSO";
+                    status.innerText = "⚠️ MEJORA EL ENFOQUE / SE MUEVE";
                     status.style.backgroundColor = "var(--amarillo-hud)";
                     status.style.color = "#000";
                     
@@ -284,7 +287,8 @@
                         laser.style.display = "none";
                     }
                 } 
-                else if (cartaDetectada && perimetroIrregular <= 0.08) {
+                // Si la imagen es clara y estable, arranca el escáner
+                else if (cartaDetectada && perimetroIrregular <= 0.15) {
                     targetBox.style.borderColor = "var(--verde-ps)";
                     
                     if (!escaneando) {
@@ -300,55 +304,43 @@
                             lecturasContadas++;
 
                             if (progreso <= 100) {
-                                status.innerText = `AUDITORÍA ESTRICTA PSA... ${progreso}%`;
+                                status.innerText = `ANALIZANDO CARTA... ${progreso}%`;
                             } else {
                                 clearInterval(temporizadorEscaneo);
                                 escaneando = false; escaneoTerminado = true;
                                 
-                                // MULTIPLICADOR DE FILTRADO EXTREMO PSA
+                                // EXIGENCIA RADICAL: Si la carta es mala o el entorno tiene ruido, las notas se desploman
                                 let promedioRuido = (irregularidadTotal / lecturasContadas) * 100;
                                 
-                                // Fórmulas hiper-exigentes: el ruido geométrico resta el triple que antes
-                                let notaBordes = Math.max(1, Math.floor(10 - (promedioRuido * 15.0)));
-                                let notaScratches = Math.max(1, Math.floor(10 - (promedioRuido * 12.0)));
-                                let notaCentrado = Math.max(1, Math.floor(10 - (promedioRuido * 8.0)));
-                                let notaEsquinas = Math.max(1, Math.floor(10 - (promedioRuido * 14.0)));
+                                let notaBordes = Math.max(1, Math.floor(10 - (promedioRuido * 22.0)));
+                                let notaScratches = Math.max(1, Math.floor(10 - (promedioRuido * 18.0)));
+                                let notaCentrado = Math.max(1, Math.floor(10 - (promedioRuido * 12.0)));
+                                let notaEsquinas = Math.max(1, Math.floor(10 - (promedioRuido * 20.0)));
                                 
-                                // Si la carta no es perfecta (promedioRuido > 0.02), PSA penaliza en bloque
-                                if (promedioRuido > 0.02) {
-                                    // Simula las notas bajas y estrictas que daría PSA a una carta defectuosa
-                                    notaBordes = Math.min(notaBordes, Math.floor(Math.random() * (6 - 3) + 3));
-                                    notaScratches = Math.min(notaScratches, Math.floor(Math.random() * (6 - 4) + 4));
-                                    notaEsquinas = Math.min(notaEsquinas, Math.floor(Math.random() * (5 - 2) + 2));
+                                // Si detecta imperfecciones (carta de mierda), forzamos notas bajas de verdad (del 1 al 5)
+                                if (promedioRuido > 0.01) {
+                                    notaBordes = Math.min(notaBordes, Math.floor(Math.random() * (5 - 2) + 2));
+                                    notaScratches = Math.min(notaScratches, Math.floor(Math.random() * (6 - 3) + 3));
+                                    notaEsquinas = Math.min(notaEsquinas, Math.floor(Math.random() * (4 - 1) + 1));
                                 }
 
-                                // La nota final en PSA no es la media aritmética, es condicionada por el peor defecto
+                                // El veredicto final se rige por el peor daño detectado
                                 let notaFinalCalculada = Math.min(notaCentrado, notaBordes, notaScratches, notaEsquinas);
                                 
-                                // Escala de Certificación Oficial de PSA (1 al 10)
-                                let psaLabel = "";
-                                switch(notaFinalCalculada) {
-                                    case 10: psaLabel = "10 (GEM MINT)"; break;
-                                    case 9: psaLabel = "9 (MINT)"; break;
-                                    case 8: psaLabel = "8 (NEAR MINT-MINT)"; break;
-                                    case 7: psaLabel = "7 (NEAR MINT)"; break;
-                                    case 6: psaLabel = "6 (EXCELLENT-MINT)"; break;
-                                    case 5: psaLabel = "5 (EXCELLENT)"; break;
-                                    case 4: psaLabel = "4 (VERY GOOD-EXCELLENT)"; break;
-                                    case 3: psaLabel = "3 (VERY GOOD)"; break;
-                                    case 2: psaLabel = "2 (GOOD)"; break;
-                                    default: psaLabel = "1 (POOR - DAÑADA)";
-                                }
+                                let rangoTexto = "";
+                                if (notaFinalCalculada === 10) rangoTexto = "10 (PERFECTA)";
+                                else if (notaFinalCalculada === 9) rangoTexto = "9 (EXCELENTE)";
+                                else if (notaFinalCalculada >= 7) rangoTexto = `${notaFinalCalculada} (ESTÁNDAR)`;
+                                else if (notaFinalCalculada >= 4) rangoTexto = `${notaFinalCalculada} (DAÑADA / USADA)`;
+                                else rangoTexto = `${notaFinalCalculada} (MUY MALA CALIDAD)`;
 
-                                // Volcar notas individuales a la tabla
                                 pintarNota('resCentrado', notaCentrado);
                                 pintarNota('resBordes', notaBordes);
                                 pintarNota('resSuperficie', notaScratches);
                                 pintarNota('resEsquinas', notaEsquinas);
                                 
-                                document.getElementById('resNota').innerText = `VERDICTO: PSA ${psaLabel}`;
+                                document.getElementById('resNota').innerText = `CALIFICACIÓN: GOSM ${rangoTexto}`;
 
-                                // Cargar datos de la carta
                                 let datosCarta = baseCartasDemo[Math.floor(Math.random() * baseCartasDemo.length)];
                                 document.getElementById('cardName').innerText = datosCarta.name;
                                 document.getElementById('cardSet').innerText = `Colección: ${datosCarta.set}`;
@@ -357,7 +349,7 @@
                                 laser.style.display = "none";
                                 tick.style.display = "block";
                                 targetBox.style.borderColor = "var(--verde-ps)";
-                                status.innerText = "AUDITORÍA PSA COMPLETADA ✔";
+                                status.innerText = "ANÁLISIS COMPLETADO ✔";
                                 status.style.backgroundColor = "var(--verde-ps)";
                                 resultsPanel.style.display = "block";
                                 btnReset.style.display = "block";
@@ -369,7 +361,7 @@
                     clearInterval(temporizadorEscaneo);
                     escaneando = false; laser.style.display = "none";
                     targetBox.style.borderColor = "var(--borde-tech)";
-                    status.innerText = "GOSM PSA: Enfoca la carta";
+                    status.innerText = "GOSM: Enfoca la carta";
                     status.style.backgroundColor = "var(--amarillo-hud)";
                 }
 
@@ -383,15 +375,15 @@
             const el = document.getElementById(id);
             el.innerText = `${nota} / 10`;
             if (nota >= 9) el.style.color = "var(--verde-ps)";
-            else if (nota >= 7) el.style.color = "var(--amarillo-hud)";
-            else el.style.color = "var(--borde-tech)"; // Rojo inmediato para notas bajas
+            else if (nota >= 6) el.style.color = "var(--amarillo-hud)";
+            else el.style.color = "var(--borde-tech)";
         }
 
         function reiniciarEscaner() {
             escaneoTerminado = false; escaneando = false; progreso = 0;
             tick.style.display = "none"; resultsPanel.style.display = "none"; btnReset.style.display = "none";
             targetBox.style.borderColor = "var(--borde-tech)";
-            status.innerText = "GOSM PSA: Enfoca la carta";
+            status.innerText = "GOSM: Enfoca la carta";
             status.style.backgroundColor = "var(--amarillo-hud)";
             status.style.color = "#000";
             procesarFotograma();
