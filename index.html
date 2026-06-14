@@ -139,7 +139,6 @@
             text-transform: uppercase;
         }
 
-        /* Contenedor visual del visor */
         .viewport-wrapper {
             position: relative;
             max-width: 440px;
@@ -152,14 +151,12 @@
             box-shadow: 0 10px 30px rgba(0,0,0,0.8);
         }
 
-        /* Hacemos que el canvas sea 100% visible, ocupando todo el recuadro */
         #canvasOutput {
             width: 100% !important;
             height: auto !important;
-            display: block !important; /* Totalmente visible a partir de ahora */
+            display: block !important;
         }
 
-        /* Ocultamos el vídeo bruto porque ya pintamos su imagen dentro del canvas */
         #videoInput {
             display: none;
         }
@@ -179,7 +176,7 @@
             height: 75%;
             border: 3px dashed var(--borde-tech);
             border-radius: 16px;
-            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45); /* Oscurece sutilmente los bordes estilo visor */
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
         }
 
         .ads-banner-bottom {
@@ -234,9 +231,7 @@
             <div id="status" class="status-badge">Inicializando Escáner Pokédex...</div>
             
             <div class="viewport-wrapper">
-                <!-- El vídeo lee los datos de la cámara -->
                 <video id="videoInput" playsinline muted></video>
-                <!-- El canvas pinta los datos del vídeo más las líneas de la IA -->
                 <canvas id="canvasOutput"></canvas>
                 
                 <div class="camera-overlay">
@@ -267,8 +262,9 @@
             status.style.backgroundColor = "#2ecc71";
             status.style.color = "#fff";
             
+            // Eliminamos restricciones estrictas de tamaño para que acepte cualquier cámara nativa
             navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: "environment", width: { ideal: 640 }, height: { ideal: 480 } }, 
+                video: true, 
                 audio: false 
             })
             .then(function(stream) {
@@ -276,11 +272,16 @@
                 video.srcObject = stream;
                 video.play();
                 
-                video.addEventListener('loadedmetadata', () => {
-                    canvasOutput.width = video.videoWidth;
-                    canvasOutput.height = video.videoHeight;
+                // Forzar que el sistema espere a tener datos reales del sensor
+                video.addEventListener('loadeddata', () => {
+                    const anchoReal = video.videoWidth;
+                    const altoReal = video.videoHeight;
+                    
+                    canvasOutput.width = anchoReal;
+                    canvasOutput.height = altoReal;
+                    
                     status.innerText = "SISTEMA ACTIVO: Apunta a tu carta";
-                    setTimeout(iniciarProcesamiento, 500);
+                    setTimeout(() => iniciarProcesamiento(anchoReal, altoReal), 600);
                 });
             })
             .catch(function(err) {
@@ -289,9 +290,10 @@
             });
         });
 
-        function iniciarProcesamiento() {
-            src = new cv.Mat(video.videoHeight, video.videoWidth, cv.CV_8UC4);
-            dst = new cv.Mat(video.videoHeight, video.videoWidth, cv.CV_8UC1);
+        function iniciarProcesamiento(ancho, alto) {
+            // Creamos las matrices con el tamaño exacto que está enviando el hardware del portátil
+            src = new cv.Mat(alto, ancho, cv.CV_8UC4);
+            dst = new cv.Mat(alto, ancho, cv.CV_8UC1);
             cap = new cv.VideoCapture(video);
             
             procesarFotograma();
@@ -301,10 +303,8 @@
             if (!streamActivo) return;
             
             try {
-                // 1. Leemos lo que ve la cámara y lo volcamos a la matriz original
                 cap.read(src);
                 
-                // 2. Duplicamos la imagen en blanco y negro de fondo para que la IA busque los bordes
                 cv.cvtColor(src, dst, cv.COLOR_RGBA2GRAY);
                 cv.GaussianBlur(dst, dst, new cv.Size(5, 5), 0);
                 cv.Canny(dst, dst, 35, 125, 3);
@@ -313,19 +313,17 @@
                 let hierarchy = new cv.Mat();
                 cv.findContours(dst, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
 
-                // 3. Dibujamos los contornos detectados directamente encima de la imagen a color real
                 for (let i = 0; i < contours.size(); ++i) {
                     let cnt = contours.get(i);
                     let area = cv.contourArea(cnt);
                     
-                    if (area > 4000) {
-                        let color = new cv.Scalar(255, 51, 85, 255); // Rojo Neón de escaneo
+                    if (area > 3000) { // Un pelín más sensible por si la cámara tiene pocos píxeles
+                        let color = new cv.Scalar(255, 51, 85, 255);
                         cv.drawContours(src, contours, i, color, 5, cv.LINE_8, hierarchy, 0);
                     }
                     cnt.delete();
                 }
 
-                // 4. Mostramos el resultado final (Vídeo real + líneas de la IA unidas) en el recuadro
                 cv.imshow('canvasOutput', src);
                 
                 contours.delete(); 
@@ -333,6 +331,7 @@
                 
                 requestAnimationFrame(procesarFotograma);
             } catch (err) {
+                // Si hay un microdesfase temporal, relanzamos el bucle sin congelar la pantalla
                 requestAnimationFrame(procesarFotograma);
             }
         }
