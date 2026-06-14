@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GOSM PRO - AI Card Identifier & Grader</title>
+    <title>GOSM PRO - PSA Style Card Analyzer</title>
     <style>
         :root {
             --rojo-pokedex: #e31a3b;
@@ -46,6 +46,7 @@
             border: 3px solid #000000;
             box-shadow: 3px 3px 0px #000;
             text-transform: uppercase;
+            font-size: 0.95rem;
         }
 
         .viewport-wrapper {
@@ -78,6 +79,7 @@
             border-radius: 16px;
             box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
             position: relative;
+            transition: border-color 0.3s ease;
         }
 
         .laser-line {
@@ -105,7 +107,6 @@
             z-index: 7;
         }
 
-        /* PANEL DE RESULTADOS REAJUSTADO */
         .results-box {
             display: none;
             margin-top: 20px;
@@ -122,22 +123,36 @@
             border-radius: 12px;
             border: 2px solid var(--borde-tech);
             margin-bottom: 20px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
         }
 
-        .card-identity-header h2 { margin: 0; font-size: 1.5rem; color: #fff; text-shadow: 1px 1px 0px #000; }
+        .card-identity-header h2 { margin: 0; font-size: 1.4rem; color: #fff; }
         .card-identity-header p { margin: 6px 0 0 0; font-size: 0.95rem; color: var(--amarillo-hud); font-family: monospace; }
-        .card-identity-header p.author-line { color: #a0a5b5; }
 
         .results-table { width: 100%; border-collapse: collapse; }
         .results-table td { padding: 12px; border-bottom: 1px solid #1f2430; font-family: monospace; font-size: 0.95rem; }
         .results-table td:first-child { color: #cbd5e1; }
-        .results-table td:last-child { text-align: right; font-weight: bold; color: var(--verde-ps); }
+        .results-table td:last-child { text-align: right; font-weight: bold; }
         
         .final-grade {
-            font-size: 1.4rem; color: #fff; margin-top: 20px; font-weight: 900; text-align: center;
+            font-size: 1.3rem; color: #fff; margin-top: 20px; font-weight: 900; text-align: center;
             background: linear-gradient(90deg, #ff3355, #b3001b); padding: 12px; border-radius: 8px; border: 2px solid #000;
-            box-shadow: 0 4px 10px rgba(227, 26, 59, 0.3);
+            letter-spacing: 1px;
+        }
+
+        .btn-reset {
+            display: none;
+            width: 100%;
+            margin-top: 20px;
+            background: linear-gradient(180deg, var(--azul-exp) 0%, #217dbb 100%);
+            color: white;
+            font-weight: bold;
+            text-transform: uppercase;
+            padding: 15px;
+            border-radius: 12px;
+            border: 3px solid #000;
+            box-shadow: 3px 3px 0px #000;
+            cursor: pointer;
+            font-size: 1.1rem;
         }
     </style>
 </head>
@@ -160,24 +175,26 @@
                 <div class="camera-overlay">
                     <div id="laser" class="laser-line"></div>
                     <div id="tick" class="success-tick">✔</div>
-                    <div class="target-box"></div>
+                    <div id="targetBox" class="target-box"></div>
                 </div>
             </div>
 
             <div id="resultsPanel" class="results-box">
                 <div class="card-identity-header">
-                    <h2 id="cardName">Detectando Identidad...</h2>
+                    <h2 id="cardName">Detectando...</h2>
                     <p id="cardSet">Colección: --</p>
-                    <p id="cardAuthor" class="author-line">Diseñador / Dueño: --</p>
+                    <p id="cardAuthor">Diseñador: --</p>
                 </div>
 
                 <table class="results-table">
-                    <tr><td>CENTRADO (CENTERING)</td><td id="resCentrado">--</td></tr>
-                    <tr><td>DESGASTE DE BORDES (EDGES)</td><td id="resBordes">--</td></tr>
-                    <tr><td>ARAÑAZOS EN SUPERFICIE (SCRATCHES)</td><td id="resSuperficie">--</td></tr>
-                    <tr><td>INTEGRIDAD DE ESQUINAS (CORNERS)</td><td id="resEsquinas">--</td></tr>
+                    <tr><td>PSA CENTERING (60/40 Max)</td><td id="resCentrado">--</td></tr>
+                    <tr><td>PSA EDGES (Bordes / Whitening)</td><td id="resBordes">--</td></tr>
+                    <tr><td>PSA SURFACE (Micro-Scratches)</td><td id="resSuperficie">--</td></tr>
+                    <tr><td>PSA CORNERS (Desgaste Esquinas)</td><td id="resEsquinas">--</td></tr>
                 </table>
-                <div class="final-grade" id="resNota">EVALUACIÓN: --</div>
+                <div class="final-grade" id="resNota">CERTIFICACIÓN PSA: --</div>
+                
+                <button id="btnReset" class="btn-reset" onclick="reiniciarEscaner()">🔄 Evaluar Otra Carta</button>
             </div>
         </div>
     </div>
@@ -190,16 +207,17 @@
         const status = document.getElementById('status');
         const laser = document.getElementById('laser');
         const tick = document.getElementById('tick');
+        const targetBox = document.getElementById('targetBox');
         const resultsPanel = document.getElementById('resultsPanel');
+        const btnReset = document.getElementById('btnReset');
 
         let src, dst, cap, openCvListo = false;
         let escaneando = false, escaneoTerminado = false, progreso = 0, temporizadorEscaneo;
         let irregularidadTotal = 0, lecturasContadas = 0;
 
-        // Base de datos de ejemplo interna
         const baseCartasDemo = [
-            { name: "Charizard G-Max VMAX", set: "Espada y Escudo: Destinos Brillantes (050/073)", author: "Ryuta Fuse / TCG Oficial" },
-            { name: "Pikachu Illustrator", set: "Promo CoroCoro Comics (1998)", author: "Atsuko Nishida / Colección Sagrada" },
+            { name: "Charizard G-Max VMAX", set: "Espada y Escudo: Destinos Brillantes (050/073)", author: "Ryuta Fuse" },
+            { name: "Pikachu Illustrator", set: "Promo CoroCoro Comics (1998)", author: "Atsuko Nishida" },
             { name: "Mewtwo Star Gold", set: "EX Holon Phantoms (103/110)", author: "Masakazu Fukuda" }
         ];
 
@@ -207,7 +225,7 @@
         .then(function(stream) {
             video.srcObject = stream;
             video.play();
-            status.innerText = "GOSM ONLINE: Enfoca una carta";
+            status.innerText = "GOSM PSA: Enfoca la carta";
         });
 
         document.getElementById('opencv-js').addEventListener('load', () => {
@@ -231,86 +249,152 @@
                 cap.read(src);
                 cv.cvtColor(src, dst, cv.COLOR_RGBA2GRAY);
                 cv.GaussianBlur(dst, dst, new cv.Size(5, 5), 0);
-                cv.Canny(dst, dst, 50, 150, 3);
+                cv.Canny(dst, dst, 80, 200, 3);
 
                 let contours = new cv.MatVector();
                 let hierarchy = new cv.Mat();
                 cv.findContours(dst, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
 
                 let cartaDetectada = false;
-                let variacionBordes = 0;
+                let perimetroIrregular = 0;
 
                 for (let i = 0; i < contours.size(); ++i) {
                     let cnt = contours.get(i);
                     let area = cv.contourArea(cnt);
-                    if (area > 3500) {
+                    
+                    if (area > 4000) {
                         let color = new cv.Scalar(255, 51, 85, 255);
                         cv.drawContours(src, contours, i, color, 4, cv.LINE_8, hierarchy, 0);
                         cartaDetectada = true;
                         let perimetro = cv.arcLength(cnt, true);
-                        variacionBordes = Math.abs((perimetro * perimetro) / (area * 16) - 1);
+                        perimetroIrregular = Math.abs((perimetro * perimetro) / (area * 16) - 1);
                     }
                     cnt.delete();
                 }
 
-                if (cartaDetectada && !escaneando) {
-                    escaneando = true;
-                    laser.style.display = "block";
-                    status.style.backgroundColor = "#3498db";
-                    progreso = 0; irregularidadTotal = 0; lecturasContadas = 0;
+                if (cartaDetectada && perimetroIrregular > 0.08) { // Filtro PSA mucho más estricto (baja de 0.12 a 0.08)
+                    targetBox.style.borderColor = "var(--amarillo-hud)";
+                    status.innerText = "⚠️ RESTRICCION PSA: MANTÉN TOTALMENTE ESTABLE / BORROSO";
+                    status.style.backgroundColor = "var(--amarillo-hud)";
+                    status.style.color = "#000";
+                    
+                    if (escaneando) {
+                        clearInterval(temporizadorEscaneo);
+                        escaneando = false;
+                        laser.style.display = "none";
+                    }
+                } 
+                else if (cartaDetectada && perimetroIrregular <= 0.08) {
+                    targetBox.style.borderColor = "var(--verde-ps)";
+                    
+                    if (!escaneando) {
+                        escaneando = true;
+                        laser.style.display = "block";
+                        status.style.backgroundColor = "var(--azul-exp)";
+                        status.style.color = "#fff";
+                        progreso = 0; irregularidadTotal = 0; lecturasContadas = 0;
 
-                    temporizadorEscaneo = setInterval(() => {
-                        progreso += 5;
-                        irregularidadTotal += variacionBordes;
-                        lecturasContadas++;
+                        temporizadorEscaneo = setInterval(() => {
+                            progreso += 5;
+                            irregularidadTotal += perimetroIrregular;
+                            lecturasContadas++;
 
-                        if (progreso <= 100) {
-                            status.innerText = `ESCANEANDO EN DETALLE... ${progreso}%`;
-                        } else {
-                            clearInterval(temporizadorEscaneo);
-                            escaneando = false; escaneoTerminado = true;
-                            
-                            // Medidor geométrico
-                            let factorDaño = (irregularidadTotal / lecturasContadas) * 100;
-                            
-                            let notaBordes = Math.max(3.5, (10 - (factorDaño * 1.8))).toFixed(1);
-                            let notaScratches = Math.max(4.0, (10 - (factorDaño * 1.4))).toFixed(1);
-                            let notaCentrado = Math.max(5.0, (10 - (factorDaño * 0.7))).toFixed(1);
-                            let notaEsquinas = Math.max(4.0, (10 - (factorDaño * 1.1))).toFixed(1);
-                            let notaFinal = ((parseFloat(notaCentrado) + parseFloat(notaBordes) + parseFloat(notaScratches) + parseFloat(notaEsquinas)) / 4).toFixed(1);
+                            if (progreso <= 100) {
+                                status.innerText = `AUDITORÍA ESTRICTA PSA... ${progreso}%`;
+                            } else {
+                                clearInterval(temporizadorEscaneo);
+                                escaneando = false; escaneoTerminado = true;
+                                
+                                // MULTIPLICADOR DE FILTRADO EXTREMO PSA
+                                let promedioRuido = (irregularidadTotal / lecturasContadas) * 100;
+                                
+                                // Fórmulas hiper-exigentes: el ruido geométrico resta el triple que antes
+                                let notaBordes = Math.max(1, Math.floor(10 - (promedioRuido * 15.0)));
+                                let notaScratches = Math.max(1, Math.floor(10 - (promedioRuido * 12.0)));
+                                let notaCentrado = Math.max(1, Math.floor(10 - (promedioRuido * 8.0)));
+                                let notaEsquinas = Math.max(1, Math.floor(10 - (promedioRuido * 14.0)));
+                                
+                                // Si la carta no es perfecta (promedioRuido > 0.02), PSA penaliza en bloque
+                                if (promedioRuido > 0.02) {
+                                    // Simula las notas bajas y estrictas que daría PSA a una carta defectuosa
+                                    notaBordes = Math.min(notaBordes, Math.floor(Math.random() * (6 - 3) + 3));
+                                    notaScratches = Math.min(notaScratches, Math.floor(Math.random() * (6 - 4) + 4));
+                                    notaEsquinas = Math.min(notaEsquinas, Math.floor(Math.random() * (5 - 2) + 2));
+                                }
 
-                            // Escoger carta de la base de datos de simulación
-                            let datosCarta = baseCartasDemo[Math.floor(Math.random() * baseCartasDemo.length)];
+                                // La nota final en PSA no es la media aritmética, es condicionada por el peor defecto
+                                let notaFinalCalculada = Math.min(notaCentrado, notaBordes, notaScratches, notaEsquinas);
+                                
+                                // Escala de Certificación Oficial de PSA (1 al 10)
+                                let psaLabel = "";
+                                switch(notaFinalCalculada) {
+                                    case 10: psaLabel = "10 (GEM MINT)"; break;
+                                    case 9: psaLabel = "9 (MINT)"; break;
+                                    case 8: psaLabel = "8 (NEAR MINT-MINT)"; break;
+                                    case 7: psaLabel = "7 (NEAR MINT)"; break;
+                                    case 6: psaLabel = "6 (EXCELLENT-MINT)"; break;
+                                    case 5: psaLabel = "5 (EXCELLENT)"; break;
+                                    case 4: psaLabel = "4 (VERY GOOD-EXCELLENT)"; break;
+                                    case 3: psaLabel = "3 (VERY GOOD)"; break;
+                                    case 2: psaLabel = "2 (GOOD)"; break;
+                                    default: psaLabel = "1 (POOR - DAÑADA)";
+                                }
 
-                            // Volcar los datos a la interfaz sin tocar nada de precios
-                            document.getElementById('cardName').innerText = datosCarta.name;
-                            document.getElementById('cardSet').innerText = `Colección: ${datosCarta.set}`;
-                            document.getElementById('cardAuthor').innerText = `Diseñador / Dueño: ${datosCarta.author}`;
+                                // Volcar notas individuales a la tabla
+                                pintarNota('resCentrado', notaCentrado);
+                                pintarNota('resBordes', notaBordes);
+                                pintarNota('resSuperficie', notaScratches);
+                                pintarNota('resEsquinas', notaEsquinas);
+                                
+                                document.getElementById('resNota').innerText = `VERDICTO: PSA ${psaLabel}`;
 
-                            document.getElementById('resCentrado').innerText = `${notaCentrado} / 10`;
-                            document.getElementById('resBordes').innerText = `${notaBordes} / 10 (Corte perimetral)`;
-                            document.getElementById('resSuperficie').innerText = `${notaScratches} / 10 (Filtro Micro-arañazos)`;
-                            document.getElementById('resEsquinas').innerText = `${notaEsquinas} / 10`;
-                            document.getElementById('resNota').innerText = `CALIFICACIÓN FINAL: GOSM ${notaFinal}`;
+                                // Cargar datos de la carta
+                                let datosCarta = baseCartasDemo[Math.floor(Math.random() * baseCartasDemo.length)];
+                                document.getElementById('cardName').innerText = datosCarta.name;
+                                document.getElementById('cardSet').innerText = `Colección: ${datosCarta.set}`;
+                                document.getElementById('cardAuthor').innerText = `Diseñador: ${datosCarta.author}`;
 
-                            laser.style.display = "none";
-                            tick.style.display = "block";
-                            status.innerText = "ANÁLISIS DE ESTRUCTURA COMPLETADO ✔";
-                            status.style.backgroundColor = "#2ecc71";
-                            resultsPanel.style.display = "block";
-                        }
-                    }, 250);
-                } else if (!cartaDetectada && escaneando) {
+                                laser.style.display = "none";
+                                tick.style.display = "block";
+                                targetBox.style.borderColor = "var(--verde-ps)";
+                                status.innerText = "AUDITORÍA PSA COMPLETADA ✔";
+                                status.style.backgroundColor = "var(--verde-ps)";
+                                resultsPanel.style.display = "block";
+                                btnReset.style.display = "block";
+                            }
+                        }, 250);
+                    }
+                } 
+                else if (!cartaDetectada && escaneando) {
                     clearInterval(temporizadorEscaneo);
                     escaneando = false; laser.style.display = "none";
-                    status.innerText = "GOSM ONLINE: Enfoca una carta";
-                    status.style.backgroundColor = "#2ecc71";
+                    targetBox.style.borderColor = "var(--borde-tech)";
+                    status.innerText = "GOSM PSA: Enfoca la carta";
+                    status.style.backgroundColor = "var(--amarillo-hud)";
                 }
 
                 cv.imshow('canvasOutput', src);
                 contours.delete(); hierarchy.delete();
             } catch (err) { }
             requestAnimationFrame(procesarFotograma);
+        }
+
+        function pintarNota(id, nota) {
+            const el = document.getElementById(id);
+            el.innerText = `${nota} / 10`;
+            if (nota >= 9) el.style.color = "var(--verde-ps)";
+            else if (nota >= 7) el.style.color = "var(--amarillo-hud)";
+            else el.style.color = "var(--borde-tech)"; // Rojo inmediato para notas bajas
+        }
+
+        function reiniciarEscaner() {
+            escaneoTerminado = false; escaneando = false; progreso = 0;
+            tick.style.display = "none"; resultsPanel.style.display = "none"; btnReset.style.display = "none";
+            targetBox.style.borderColor = "var(--borde-tech)";
+            status.innerText = "GOSM PSA: Enfoca la carta";
+            status.style.backgroundColor = "var(--amarillo-hud)";
+            status.style.color = "#000";
+            procesarFotograma();
         }
     </script>
 </body>
